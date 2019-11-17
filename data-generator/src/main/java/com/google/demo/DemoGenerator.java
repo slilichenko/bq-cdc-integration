@@ -54,12 +54,12 @@ public class DemoGenerator {
 
     if (params.originalSessionCount > 0) {
       log.info("Starting batch inserts...");
-      TableId mainSessionTableId = TableId.of(params.projectId, "data", "session");
+      TableId mainSessionTableId = TableId.of(params.projectId, "cdc_demo", "session_main");
       bigQueryService.doBatchInserts(mainSessionTableId, params.originalSessionCount, 100);
     }
 
     log.info("Starting data sync simulation...");
-    TableId deltaSessionTableId = TableId.of(params.projectId, "data", "session_delta");
+    TableId deltaSessionTableId = TableId.of(params.projectId, "cdc_demo", "session_delta");
     doStreamingInserts(bigQueryService, bigTableService, deltaSessionTableId, params);
   }
 

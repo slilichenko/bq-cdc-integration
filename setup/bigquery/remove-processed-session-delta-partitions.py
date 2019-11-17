@@ -11,7 +11,7 @@ def remove_partitions():
 
   for row in results:
     partition_id = row.partition_id
-    table_ref = client.dataset('data').table("{}${}".format('session_delta', partition_id))
+    table_ref = client.dataset('cdc_demo').table("{}${}".format('session_delta', partition_id))
     print("Partition to be deleted: {}".format(table_ref))
     client.delete_table(table_ref)
 

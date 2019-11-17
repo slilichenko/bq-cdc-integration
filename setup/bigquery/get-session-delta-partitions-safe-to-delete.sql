@@ -8,8 +8,8 @@ FROM (
     SELECT
       DISTINCT(_partitiontime) AS pt
     FROM
-      data.session_delta d,
-      data.session s
+      cdc_demo.session_delta d,
+      cdc_demo.session_main s
     WHERE
       d.session_id = s.session_id
       AND d._partitiontime IS NOT NULL))

@@ -1,16 +1,16 @@
-resource "google_bigquery_dataset" "data" {
-  dataset_id = "data"
-  friendly_name = "data"
+resource "google_bigquery_dataset" "cdc_demo" {
+  dataset_id = "cdc_demo"
+  friendly_name = "CDC/BigQuery integration demo"
   description = "Dataset to store all the data in this project"
   location = "US"
 
   depends_on = ["google_bigtable_table.session"]
   provisioner "local-exec" {
-    command = "./create-bigtable-session-link.sh ${var.project_id} ${google_bigquery_dataset.data.dataset_id}"
+    command = "./create-bigtable-session-link.sh ${var.project_id} ${google_bigquery_dataset.cdc_demo.dataset_id}"
   }
   provisioner "local-exec" {
     when = "destroy"
-    command = "./remove-bigtable-session-link.sh ${google_bigquery_dataset.data.dataset_id}"
+    command = "./remove-bigtable-session-link.sh ${google_bigquery_dataset.cdc_demo.dataset_id}"
   }
 }
 
@@ -77,14 +77,14 @@ variable "last_update_seq_number" {
 EOF
 }
 
-resource "google_bigquery_table" "session" {
-  dataset_id = "${google_bigquery_dataset.data.dataset_id}"
-  table_id = "session"
+resource "google_bigquery_table" "session_main" {
+  dataset_id = "${google_bigquery_dataset.cdc_demo.dataset_id}"
+  table_id = "session_main"
   schema = "[${var.common_session_columns}, ${var.last_update_seq_number}]"
 }
 
 resource "google_bigquery_table" "session_delta" {
-  dataset_id = google_bigquery_dataset.data.dataset_id
+  dataset_id = google_bigquery_dataset.cdc_demo.dataset_id
   table_id = "session_delta"
 
   time_partitioning {
@@ -96,7 +96,7 @@ resource "google_bigquery_table" "session_delta" {
 }
 
 resource "google_bigquery_table" "session_source_v" {
-  dataset_id = "${google_bigquery_dataset.data.dataset_id}"
+  dataset_id = "${google_bigquery_dataset.cdc_demo.dataset_id}"
   table_id = "session_source_v"
 
   view {
@@ -107,13 +107,13 @@ SELECT rowkey as session_id,
   main.status.cell.value as status,
   TIMESTAMP(main.start_ts.cell.value) as start_ts,
   TIMESTAMP(main.end_ts.cell.value) as end_ts
-  FROM `${var.project_id}.${google_bigquery_dataset.data.dataset_id}.source_session`
+  FROM `${var.project_id}.${google_bigquery_dataset.cdc_demo.dataset_id}.source_session`
 EOF
   }
 }
 
 resource "google_bigquery_table" "session_latest_v" {
-  dataset_id = google_bigquery_dataset.data.dataset_id
+  dataset_id = google_bigquery_dataset.cdc_demo.dataset_id
   table_id = "session_latest_v"
   view {
     use_legacy_sql = false
@@ -129,13 +129,13 @@ FROM (
       * EXCEPT(di_operation_type),
       di_operation_type
     FROM
-      `${var.project_id}.${google_bigquery_dataset.data.dataset_id}.${google_bigquery_table.session_delta.table_id}`
+      `${var.project_id}.${google_bigquery_dataset.cdc_demo.dataset_id}.${google_bigquery_table.session_delta.table_id}`
     UNION ALL
     SELECT
       *,
       'I'
     FROM
-      `${var.project_id}.${google_bigquery_dataset.data.dataset_id}.${google_bigquery_table.session.table_id}`))
+      `${var.project_id}.${google_bigquery_dataset.cdc_demo.dataset_id}.${google_bigquery_table.session_main.table_id}`))
 WHERE
   row_num = 1
   AND di_operation_type <> 'D'
