@@ -36,4 +36,10 @@ INNER JOIN
   cdc_demo.session_main dest
 ON
   dest.session_id = src.session_id
-  WHERE dest.status <> src.status) ORDER BY 1
+  WHERE dest.status <> src.status
+  UNION ALL
+  SELECT
+    'Total record in the source' AS description,
+    COUNT(*) AS count
+  FROM
+    cdc_demo.session_source_v src ) ORDER BY 1
