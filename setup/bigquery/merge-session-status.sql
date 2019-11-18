@@ -39,7 +39,7 @@ ON
   WHERE dest.status <> src.status
   UNION ALL
   SELECT
-    'Total record in the source' AS description,
+    'Total records in the source' AS description,
     COUNT(*) AS count
   FROM
     cdc_demo.session_source_v src ) ORDER BY 1
