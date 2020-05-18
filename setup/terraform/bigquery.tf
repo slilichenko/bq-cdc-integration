@@ -78,7 +78,7 @@ EOF
 }
 
 resource "google_bigquery_table" "session_main" {
-  dataset_id = "google_bigquery_dataset.cdc_demo.dataset_id"
+  dataset_id = google_bigquery_dataset.cdc_demo.dataset_id
   table_id = "session_main"
   schema = "[${var.common_session_columns}, ${var.last_update_seq_number}]"
 }
@@ -96,7 +96,7 @@ resource "google_bigquery_table" "session_delta" {
 }
 
 resource "google_bigquery_table" "session_source_v" {
-  dataset_id = "google_bigquery_dataset.cdc_demo.dataset_id"
+  dataset_id = google_bigquery_dataset.cdc_demo.dataset_id
   table_id = "session_source_v"
 
   view {

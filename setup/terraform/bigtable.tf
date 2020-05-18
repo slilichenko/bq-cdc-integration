@@ -10,7 +10,7 @@ resource "google_bigtable_instance" "instance" {
 
 resource "google_bigtable_table" "session" {
   name = "session"
-  instance_name = "${google_bigtable_instance.instance.name}"
+  instance_name = google_bigtable_instance.instance.name
   column_family {
     family = "main"
   }
