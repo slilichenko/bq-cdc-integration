@@ -4,12 +4,12 @@ resource "google_bigquery_dataset" "cdc_demo" {
   description = "Dataset to store CDC demo data"
   location = "US"
 
-  depends_on = ["google_bigtable_table.session"]
+  depends_on = [google_bigtable_table.session]
   provisioner "local-exec" {
     command = "./create-bigtable-session-link.sh ${var.project_id} ${google_bigquery_dataset.cdc_demo.dataset_id}"
   }
   provisioner "local-exec" {
-    when = "destroy"
+    when = destroy
     command = "./remove-bigtable-session-link.sh ${google_bigquery_dataset.cdc_demo.dataset_id}"
   }
 }
@@ -78,7 +78,7 @@ EOF
 }
 
 resource "google_bigquery_table" "session_main" {
-  dataset_id = "${google_bigquery_dataset.cdc_demo.dataset_id}"
+  dataset_id = "google_bigquery_dataset.cdc_demo.dataset_id"
   table_id = "session_main"
   schema = "[${var.common_session_columns}, ${var.last_update_seq_number}]"
 }
