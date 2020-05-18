@@ -1,7 +1,7 @@
 resource "google_bigquery_dataset" "cdc_demo" {
   dataset_id = "cdc_demo"
   friendly_name = "CDC/BigQuery integration demo"
-  description = "Dataset to store all the data in this project"
+  description = "Dataset to store CDC demo data"
   location = "US"
 
   depends_on = ["google_bigtable_table.session"]
