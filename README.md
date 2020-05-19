@@ -1,8 +1,15 @@
 # BigQuery - Change Data Capture Demo
 
 ## Overview
-This project uses a simple data generator to simulate web site purchasing behavior. 
-Source data is captured in a BigTable and the changes are pushed via streaming inserts into BigQuery.
+This project is a demo of how Change Data Capture can be used to replicate data to Google's BigQuery. 
+
+A simple data generator to simulate a typical web site session life cycle. A session has several attributes - 
+id, start time, end time, customer id, and status (new, logged in, logged out, abandoned). All attributes except start time are mutable and each session can go through several status transitions within several minutes. 
+
+Demo code uses BigTable as the source of data and uses BigQuery’s streaming inserts to populate the delta table. 
+The demo was built to simulate SAP Data Services replication to BigQuery and uses column naming conventions 
+specific to that process.
+
 The source code provides several scripts that help monitor of the data replication process and data availability in various tables.
 
 ## Setup
@@ -14,26 +21,32 @@ You need to have sufficient privileges in that project to create BigQuery datase
 export TF_VAR_project_id=$(gcloud config get-value project)
 ```
 
+Set up a variable to be used in several shell commands:
+```.env
+export DEMO_HOME=<root directory of the checked-out repository>
+```
+
 To create the environment for the demo:
 ```
-find . -name '*.sh' -exec chmod +x {} \;
-cd setup
+find $DEMO_HOME -name '*.sh' -exec chmod +x {} \;
+cd $DEMO_HOME/setup
 ./create-all.sh
 ```
 At the end of the successful setup you will have created:
-1. BigTable cluster `cdc-demo`
-1. Table `session` in that cluster
-1. BigQuery dataset `cdc_demo`
-1. Tables `session_main` and `session_delta`
-1. View `session_source_v` over the BigTable's `session` table (as a federated data source)
-1. View `session_latest_v` - 
+- BigTable instance `bq-sync-instance` with `bq-sync-instance-cluster` cluster
+    - Table `session` in that cluster. This table is the source data for the demo.
+- BigQuery dataset `cdc_demo`
+    - Table `session_main`. Snapshot of the source of the data at a point in time.
+    - Table `session_delta`. CDC events of the source data.
+    - View `session_source_v`. View into the BigTable's `session` table (added as a federated data source).
+    - View `session_latest_v`. View that selects the latest session record from `session_main` and `session_delta` tables.
 
 
 ## Generating data
 In a separate Cloud Shell window or in a separate terminal window:
 1. Build the executable:
 ```
-cd data-generator/
+cd $DEMO_HOME/data-generator/
 mvn package
 ```
 
@@ -72,7 +85,7 @@ As part of the Terraform setup you created a view called “session_latest_v”,
 
 Let’s see how it performs. Switch to the directory with various BigQuery-related scripts:
 ```
-cd setup/bigquery/
+cd $DEMO_HOME/setup/bigquery/
 ```
 
 Run this script to monitor the discrepancies between the data source and the view (it executes a query periodically):
@@ -110,8 +123,7 @@ Waiting on bqjob_r5327a5c14a431ef8_0000016e7bb268d5_1 ... (3s) Current status: D
 +----------------------------+-------+---------------------+
 ```
 
-
-The data is mostly in sync with the source, but there are cases where the data in the source hasn’t been replicated yet to BigQuery, or records in BigQuery’s streaming buffer are not yet available for queries. As soon as you stop data generation the discrepancies disappear. 
+The data is most of the time in sync with the source, but there are cases where the data in the source hasn’t been replicated yet to BigQuery, or records in BigQuery’s streaming buffer are not yet available for queries. As soon as you stop data generation the discrepancies disappear. 
 
 Stop the script by using Ctrl+C.
 
@@ -119,7 +131,7 @@ Stop the script by using Ctrl+C.
 ###Monitoring the progress of merging
 First, let’s set up a process to monitor the status of merging. Switch to the directory with BigQuery scripts:
 ```
-cd ~/bq-cdc-integration/setup/bigquery/
+cd $DEMO_HOME/setup/bigquery/
 ```
 
 Run the script that queries the main table and shows the discrepancies:
@@ -144,7 +156,7 @@ That means that there are no merged records in the main table yet. Keep this pro
 ### Run merge process on a periodic basis
 Demo code contains a simple script which runs the merge DML statement every two minutes. Open another Cloud Shell tab or Terminal window and run:
 ```
-cd ~/bq-cdc-integration/setup/bigquery
+cd $DEMO_HOME/setup/bigquery
 ./merge-periodically.sh
 ```
 
@@ -208,7 +220,7 @@ Note: in order to demo partition deletion you would need to run the merge proces
 
 To see which partitions of the delta table can be removed run these commands:
 ```
-cd ~/bq-cdc-integration/setup/bigquery/
+cd $DEMO_HOME/setup/bigquery/
 cat get-session-delta-partitions-safe-to-delete.sql | bq query --use_legacy_sql=false
 ```
 
@@ -236,6 +248,6 @@ Partition to be deleted: TableReference(DatasetReference(u'bigquery-data-sync-de
 
 ## Cleanup
 ```
-cd setup
+cd $DEMO_HOME/setup
 ./remove-all.sh
 ```
