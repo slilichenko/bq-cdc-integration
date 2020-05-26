@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,12 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
+/**
+ * BigQuery helper class used to generate insert statements.
+ */
 public class Struct {
 
-  private LinkedHashMap<String, String> fields = new LinkedHashMap<>();
+  private final LinkedHashMap<String, String> fields = new LinkedHashMap<>();
 
   public Struct addString(String name, String value) {
     if (value != null) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,14 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-public class DemoGenerator {
+/**
+ * Main class to generate data in a Bigtable "session" table and send corresponding
+ * Change Data Capture events to BigQuery's "session_delta".
+ *
+ * Optionally simulates the initial data load by generating Bigtable data and
+ * in parallel populating BigQuery's "session_main" table.
+ */
+class DemoGenerator {
 
   private static final Logger log = Logger.getLogger(DemoGenerator.class.getName());
 
@@ -46,6 +53,10 @@ public class DemoGenerator {
   private static final String UPDATE_PERCENT = "update_percent";
   private static final String DELETE_PERCENT = "delete_percent";
   private static final String PROJECT_ID = "project_id";
+
+  // Entries below must match names defined in Terraform's variables.tf
+  private static final String BQ_DATASET_ID = "cdc_demo";
+  private static final String BIGTABLE_INSTANCE_ID = "bq-sync-instance";
 
   private static class Parameters {
 
@@ -57,30 +68,48 @@ public class DemoGenerator {
     String projectId;
   }
 
+  /**
+   * Main function of the demo generator. To see usage run without any parameters.
+   *
+   * @param args demo arguments
+   * @throws InterruptedException
+   * @throws IOException
+   */
   public static void main(String[] args) throws InterruptedException, IOException {
     Parameters params = getParameters(args);
 
     BigQueryService bigQueryService = new BigQueryService(
         BigQueryOptions.getDefaultInstance().getService());
 
-    BigTableService bigTableService = new BigTableService(BigtableDataClient.create(
+    BigtableService bigTableService = new BigtableService(BigtableDataClient.create(
         BigtableDataSettings.newBuilder().setProjectId(params.projectId)
-            .setInstanceId("bq-sync-instance")
+            .setInstanceId(BIGTABLE_INSTANCE_ID)
             .build()));
 
     if (params.originalSessionCount > 0) {
       log.info("Starting batch inserts...");
-      TableId mainSessionTableId = TableId.of(params.projectId, "cdc_demo", "session_main");
+      TableId mainSessionTableId = TableId.of(params.projectId, BQ_DATASET_ID, "session_main");
       bigQueryService.doBatchInserts(mainSessionTableId, params.originalSessionCount, 100);
     }
 
     log.info("Starting data sync simulation...");
-    TableId deltaSessionTableId = TableId.of(params.projectId, "cdc_demo", "session_delta");
+    TableId deltaSessionTableId = TableId.of(params.projectId, BQ_DATASET_ID, "session_delta");
     doStreamingInserts(bigQueryService, bigTableService, deltaSessionTableId, params);
   }
 
+  /**
+   * Starts the process of simulating Change Data Capture-like inserts into BigQuery.
+   *
+   * The process runs continuously until a file named "sync.stop" appears in the current directory
+   *
+   * @param bigQueryService
+   * @param bigtableService
+   * @param tableId
+   * @param parameters
+   * @throws InterruptedException
+   */
   private static void doStreamingInserts(BigQueryService bigQueryService,
-      BigTableService bigTableService, TableId tableId,
+      BigtableService bigtableService, TableId tableId,
       Parameters parameters)
       throws InterruptedException {
 
@@ -95,8 +124,8 @@ public class DemoGenerator {
         break;
       }
 
-      // Creating containers for BigTable and BigQuery to store mutations and inserts
-      BulkMutation bulkMutation = bigTableService.createBulkMutationForSession();
+      // Creating containers for Bigtable and BigQuery to store mutations and inserts
+      BulkMutation bulkMutation = bigtableService.createBulkMutationForSession();
       InsertAllRequest.Builder insertRequestBuilder = InsertAllRequest.newBuilder(tableId);
 
       // Creating new inserts
@@ -105,7 +134,7 @@ public class DemoGenerator {
         Session session = new Session();
         newInserts.add(session);
 
-        bigTableService.addOrUpdateSession(bulkMutation, session);
+        bigtableService.addOrUpdateSession(bulkMutation, session);
         bigQueryService.addInsertRow(insertRequestBuilder, session.toBigQueryRow());
       }
 
@@ -126,19 +155,19 @@ public class DemoGenerator {
               break;
           }
 
-          bigTableService.addOrUpdateSession(bulkMutation, session);
+          bigtableService.addOrUpdateSession(bulkMutation, session);
           bigQueryService.addUpdateRow(insertRequestBuilder, session.toBigQueryRow());
         }
 
         // Simulating deletes
         int deleteCount = parameters.insertsPerBatch * parameters.percentOfDeletesPerBatch / 100;
-        for (int i = 0; i < deleteCount; i++) {
+        while (deleteCount-- > 0) {
           int nextRecordToDelete = random.nextInt(previousRecords.size());
 
           Session session = previousRecords.get(nextRecordToDelete);
           previousRecords.remove(nextRecordToDelete);
 
-          bigTableService.deleteSession(bulkMutation, session);
+          bigtableService.deleteSession(bulkMutation, session);
           bigQueryService.addDeleteRow(insertRequestBuilder, session.toBigQueryRow());
         }
       }
@@ -151,20 +180,25 @@ public class DemoGenerator {
         Session session = previousRecords.remove(0);
         if (session.getStatus() != Status.LOGGED_OUT) {
           session.abandon();
-          bigTableService.addOrUpdateSession(bulkMutation, session);
+          bigtableService.addOrUpdateSession(bulkMutation, session);
           bigQueryService.addUpdateRow(insertRequestBuilder, session.toBigQueryRow());
         }
       }
 
-      // Save the data into BigTable and BigQuery
-      bigTableService.bulkUpdate(bulkMutation);
+      // Save the data into Bigtable and BigQuery
+      bigtableService.bulkUpdate(bulkMutation);
       bigQueryService.runInsertAll(insertRequestBuilder);
 
       Thread.sleep(1000 * parameters.pauseBetweenBatchInSeconds);
     }
   }
 
-
+  /**
+   * Extract and validate command line parameters.
+   *
+   * @param args
+   * @return parameters object with strongly typed parameters, exits if validation failed.
+   */
   private static Parameters getParameters(String[] args) {
     Options commandLineOptions = createCommandLineOptions();
 
@@ -180,13 +214,22 @@ public class DemoGenerator {
 
       return result;
     } catch (ParseException e) {
-      new HelpFormatter().printHelp("java -jar demogenerator.jar", commandLineOptions);
+      new HelpFormatter().printHelp("java -jar target/data-generator-1.0-SNAPSHOT-shaded.jar", commandLineOptions);
       e.printStackTrace();
       System.exit(-1);
       return null;
     }
   }
 
+  /**
+   * Helper function to extract an integer parameter
+   *
+   * @param cmd
+   * @param optionName
+   * @param defaultValue
+   * @return
+   * @throws ParseException
+   */
   private static int getIntParameter(CommandLine cmd, String optionName, int defaultValue)
       throws ParseException {
     if (cmd.getOptionValue(optionName) == null) {
@@ -196,13 +239,15 @@ public class DemoGenerator {
         .intValue();
   }
 
-
+  /**
+   * @return available command line options
+   */
   private static Options createCommandLineOptions() {
     Options options = new Options();
 
     options.addOption(
         Option.builder().longOpt(ORIGINAL_SESSION_SIZE)
-            .desc("Original number of records in the session table")
+            .desc("Original number of records in the session_main table")
             .hasArg()
             .type(Number.class)
             .argName("number").build());

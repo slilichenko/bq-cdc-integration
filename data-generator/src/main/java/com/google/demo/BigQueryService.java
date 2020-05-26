@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,39 +22,64 @@ import com.google.cloud.bigquery.InsertAllRequest.Builder;
 import com.google.cloud.bigquery.InsertAllResponse;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.TableId;
-import com.google.cloud.bigquery.TableResult;
 import com.google.demo.bigquery.Struct;
 import com.google.demo.model.Session;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
-public class BigQueryService {
+/**
+ * Helper class to encapsulate BigQuery services
+ */
+class BigQueryService {
+
   private static final Logger log = Logger.getLogger(BigQueryService.class.getName());
 
-  public static final String DI_SEQUENCE_COLUMN = "di_sequence_number";
-  public static final String DI_OPERATION_COLUMN = "di_operation_type";
+  private static final String DI_SEQUENCE_COLUMN = "di_sequence_number";
+  private static final String DI_OPERATION_COLUMN = "di_operation_type";
 
-  private BigQuery bigQuery;
-  private AtomicInteger insertSequence = new AtomicInteger();
+  // Operation types
+  private static final String INSERT_OP = "I";
+  private static final String UPDATE_OP = "U";
+  private static final String DELETE_OP = "D";
 
-  public BigQueryService(BigQuery bigQuery) {
+  private final BigQuery bigQuery;
+  // Technically doesn't need to be atomic (the demo generator doesn't use concurrency at the moment)
+  private final AtomicInteger insertSequence = new AtomicInteger();
+
+  /**
+   * @param bigQuery all the operations will use this object to operate on BigQuery
+   */
+  BigQueryService(BigQuery bigQuery) {
     this.bigQuery = bigQuery;
   }
 
-  public void addInsertRow(InsertAllRequest.Builder requestBuilder, Map<String,Object> row) {
-    addRowWithOperation(requestBuilder, row, "I");
+  /**
+   * Adds a row to indicate an INSERT in the source table.
+   */
+  void addInsertRow(InsertAllRequest.Builder requestBuilder, Map<String, Object> row) {
+    addRowWithOperation(requestBuilder, row, INSERT_OP);
   }
 
-  public void addUpdateRow(InsertAllRequest.Builder requestBuilder, Map<String,Object> row) {
-    addRowWithOperation(requestBuilder, row, "U");
+  /**
+   * Adds a row to indicate an UPDATE in the source table.
+   */
+  void addUpdateRow(InsertAllRequest.Builder requestBuilder, Map<String, Object> row) {
+    addRowWithOperation(requestBuilder, row, UPDATE_OP);
   }
 
-  public void addDeleteRow(InsertAllRequest.Builder requestBuilder, Map<String,Object> row) {
-    addRowWithOperation(requestBuilder, row, "D");
+  /**
+   * Adds a row to indicate a DELETE in the source table.
+   */
+  void addDeleteRow(InsertAllRequest.Builder requestBuilder, Map<String, Object> row) {
+    addRowWithOperation(requestBuilder, row, DELETE_OP);
   }
 
-  private void addRowWithOperation(Builder requestBuilder, Map<String, Object> row, String operation) {
+  /**
+   * Helper function to add a row.
+   */
+  private void addRowWithOperation(Builder requestBuilder, Map<String, Object> row,
+      String operation) {
     row.put(DI_OPERATION_COLUMN, operation);
     row.put(DI_SEQUENCE_COLUMN, insertSequence.incrementAndGet());
 
@@ -62,18 +87,22 @@ public class BigQueryService {
   }
 
 
-  public void doBatchInserts(TableId tableId,
-      int maxInserts, int batchSize) throws InterruptedException {
+  /**
+   * Populate BigQuery table with session data.
+   *
+   * NOTE: at the moment doesn't insert the data into the Bigtable
+   */
+  void doBatchInserts(TableId tableId,
+      int recordCount, int batchSize) throws InterruptedException {
 
-    while (maxInserts > 0) {
-      int nextBatchSize = Math.min(batchSize, maxInserts);
+    while (recordCount > 0) {
+      int nextBatchSize = Math.min(batchSize, recordCount);
       log.info("Inserting next batch of " + nextBatchSize + " records.");
 
       StringBuilder queryBuilder = new StringBuilder();
-      queryBuilder.append(
-          "INSERT INTO `" +
-              tableId.getProject() + '.' + tableId.getDataset() + "." + tableId.getTable()
-              + "` SELECT * FROM UNNEST([");
+      queryBuilder.append("INSERT INTO `").append(tableId.getProject()).append('.')
+          .append(tableId.getDataset()).append(".").append(tableId.getTable())
+          .append("` SELECT * FROM UNNEST([");
       for (int i = 0; i < nextBatchSize; i++) {
         Session session = new Session();
         Struct struct = session.toBigQueryStruct();
@@ -89,20 +118,26 @@ public class BigQueryService {
       log.fine("Query: " + query);
       QueryJobConfiguration queryConfig = QueryJobConfiguration.newBuilder(query)
           .build();
-      TableResult result = bigQuery.query(queryConfig);
+      bigQuery.query(queryConfig);
 
-      maxInserts -= batchSize;
+      recordCount -= batchSize;
     }
   }
 
-  public void runInsertAll(Builder insertRequestBuilder) {
+  /**
+   * Process the streaming inserts.
+   *
+   * @param insertRequestBuilder to run
+   */
+  void runInsertAll(Builder insertRequestBuilder) {
     InsertAllRequest insertRequest = insertRequestBuilder.build();
     InsertAllResponse insertResponse = bigQuery.insertAll(insertRequest);
-    // TODO: shall we fail immediately?
     if (insertResponse.hasErrors()) {
-      log.warning("Errors occurred while inserting rows: " + insertResponse.getInsertErrors());
+      // This is an acceptable approach for a demo program
+      throw new RuntimeException(
+          "Errors occurred while inserting rows: " + insertResponse.getInsertErrors());
     } else {
-      log.info("Inserted next batch of " + insertRequest.getRows().size() + " rows.");
+      log.info("Inserted next batch of " + insertRequest.getRows().size() + " row(s).");
     }
   }
 }

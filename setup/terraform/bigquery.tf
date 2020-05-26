@@ -1,5 +1,5 @@
 resource "google_bigquery_dataset" "cdc_demo" {
-  dataset_id = "cdc_demo"
+  dataset_id = var.bigquery_dataset_id
   friendly_name = "CDC/BigQuery integration demo"
   description = "Dataset to store CDC demo data"
   location = "US"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,14 +24,17 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Session model used for the demo.
+ */
 public class Session {
 
   public enum Status {NEW, ABANDONED, LOGGED_IN, LOGGED_OUT}
 
-  private String sessionId;
+  private final String sessionId;
   private Status status;
   private String customerKey;
-  private Instant start;
+  private final Instant start;
   private Instant end;
 
   public Session() {
@@ -67,6 +70,7 @@ public class Session {
 
   public Struct toBigQueryStruct() {
     Struct result = new Struct();
+    // Order of fields must match the order defined in the table definition (see bigquery.tf).
     result.addString(Constants.SESSION_ID_COLUMN, sessionId)
         .addString(Constants.STATUS_COLUMN, status.name())
         .addString(Constants.CUSTOMER_KEY_COLUMN, customerKey)

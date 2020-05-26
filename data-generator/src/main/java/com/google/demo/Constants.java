@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,4 +22,5 @@ public class Constants {
   public static final String END_COLUMN = "end_ts";
   public static final String CUSTOMER_KEY_COLUMN = "customer_key";
   public static final String STATUS_COLUMN = "status";
+  static final String MAIN_FAMILY = "main";
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,16 @@ import com.google.cloud.bigquery.QueryParameterValue;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+/**
+ * BigQuery data type conversion utility.
+ */
 public class ConversionUtil {
 
+  /**
+   * Converts instant into BigQuery timestamp
+   * @param instant to convert to String
+   * @return String representation of the instant
+   */
   public static String convertToTimestamp(Instant instant) {
     if (instant == null) {
       return null;
