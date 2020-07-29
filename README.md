@@ -83,7 +83,15 @@ The start.sh script runs data generation process in the background. To stop it, 
 ## Immediate data consistency
 As part of the Terraform setup you created a view called “session_latest_v”, and a script that checks for the differences between the source database and the data in this view.
 
-Let’s see how it performs. Switch to the directory with various BigQuery-related scripts:
+Let’s see how it performs. 
+
+Set the project id
+Set up your session project id if it is not yet set:
+```.env
+gcloud config set project [PROJECT_ID]
+```
+
+Switch to the directory with various BigQuery-related scripts:
 ```
 cd $DEMO_HOME/setup/bigquery/
 ```
