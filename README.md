@@ -1,19 +1,20 @@
-# BigQuery - Change Data Capture Demo
+# Database Replication Into BigQuery Using Change Data Capture Demo
 
 ## Overview
 This project is a demo of how Change Data Capture can be used to replicate data to Google's BigQuery. 
 
-A simple data generator to simulate a typical web site session life cycle. A session has several attributes - 
-id, start time, end time, customer id, and status (new, logged in, logged out, abandoned). All attributes except start time are mutable and each session can go through several status transitions within several minutes. 
+A simple data generator simulates a typical web site session life cycle. A session has several attributes - 
+id, start time, end time, customer id, and status (new, logged in, logged out, abandoned). 
+All attributes except the start time are mutable and each session can go through several status transitions within several minutes. 
 
-Demo code uses BigTable as the source of data and uses BigQuery’s streaming inserts to populate the delta table. 
-The demo was built to simulate SAP Data Services replication to BigQuery and uses column naming conventions 
+Demo code uses BigTable as the data source and uses BigQuery’s streaming inserts to populate the destination table. 
+The demo mimics SAP Data Services replication to BigQuery and uses column naming conventions 
 specific to that process.
 
-The source code provides several scripts that help monitor of the data replication process and data availability in various tables.
+The source code provides several scripts that help monitor the data replication process and data availability in various tables.
 
 ## Setup
-**Note:** the demo uses BigTable and BigQuery and you may incur changes. To avoid or minimize the charges make sure to shut down the data generation script and clean up the environment at the end.
+**Note:** the demo uses BigTable and BigQuery and you may incur charges. To avoid or minimize the charges make sure to shut down the data generation script and clean up the environment at the end.
 
 Decide which GCP project you would like to run this demo in (the snippet below assumes your current project).
 You need to have sufficient privileges in that project to create BigQuery dataset and tables and a BigTable cluster and a table.
@@ -77,15 +78,13 @@ The start script accepts several different parameters which can be used to tune 
 Let this process run in this terminal window until you are ready to stop it at the end of the demo.
 
 ### Stopping data generation
-The start.sh script runs data generation process in the background. To stop it, run:
+The start.sh script runs the data generation process in the background. To stop it, run:
 	./stop.sh
 
 ## Immediate data consistency
-As part of the Terraform setup you created a view called “session_latest_v”, and a script that checks for the differences between the source database and the data in this view.
-
+As part of the Terraform setup you created a view called “session_latest_v”, and a script that checks for the differences between the source database and the data in this view. 
 Let’s see how it performs. 
 
-Set the project id
 Set up your session project id if it is not yet set:
 ```.env
 gcloud config set project [PROJECT_ID]
@@ -209,7 +208,7 @@ Waiting on bqjob_r41629d8746e64399_0000016e7bbe4bfc_1 ... (2s) Current status: D
 
 You can see how the merge process keeps updating the records, but with constant data generation there are some data consistency delays.
 
-After several minutes stop the data generation process. Within 2 minutes you should see this output:
+After several minutes stop the data generation process. Within 2 minutes you should see an output similar to this one:
 ```
 +----------------------------+-------+---------------------+
 |        description         | count |     measured_ts     |
